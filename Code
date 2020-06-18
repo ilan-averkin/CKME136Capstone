@@ -1,3 +1,9 @@
+##Step 1
 insurance <- read.csv("C:/Users/Ilan/Desktop/insurance.csv")
 summary(insurance)
 library(ggplot2)
+ggplot(data = insurance, aes(region, charges)) + geom_boxplot(fill = c(1:4)) + ggtitle("Medical Charges per Region, Boxplot")
+ggplot(data = insurance, aes(smoker, charges)) + geom_boxplot(fill = c(1:2)) + ggtitle("Medical Charges from Smoking, Boxplot")
+ggplot(data = insurance, aes(sex, charges)) + geom_boxplot(fill = c(1:2)) + ggtitle("Medical Charges by Gender, Boxplot")
+ggplot(data = insurance, aes(as.factor(children), charges)) + geom_boxplot(fill = c(1:6)) + ggtitle("Medical Charges by Number of Children, Boxplot")
+insurance$obese <- ifelse(insurance$bmi >= 30, "yes", "no")
