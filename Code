@@ -1,0 +1,3 @@
+insurance <- read.csv("C:/Users/Ilan/Desktop/insurance.csv")
+summary(insurance)
+library(ggplot2)
