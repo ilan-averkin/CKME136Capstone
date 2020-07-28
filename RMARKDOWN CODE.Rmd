@@ -1,0 +1,270 @@
+---
+title: "Initial Code and Results"
+output: pdf_document
+Author: Ilan Averkin
+---
+##Load Dataset into R
+```{r}
+insurance <- read.csv("C:/Users/Ilan/Desktop/insurance.csv")
+```
+## Load the needed libraries
+```{r}
+library(ggplot2)
+library(psych)
+library(dplyr)
+library(xgboost)
+library(randomForest)
+library(Matrix)
+library(caret)
+library(Metrics)
+(tinytex.verbose = TRUE)
+```
+##A quick summary of the dataset reveals the different attributes we are dealing with
+##is.na reveals if there are any missing variables in the dataset
+```{r}
+summary(insurance)
+colSums (is.na(insurance))
+```
+##BOXPLOTS
+```{r}
+##For gender in relation to charges we are able to see that the data is relatively similar to and doesnt have a major affect on charges. Females seem to have more outliers which can be investigated furhter in the analysis
+ggplot(data = insurance, aes(sex, charges)) + geom_boxplot(fill = c(1:2)) + ggtitle("Medical Charges by Gender, Boxplot")
+```
+
+```{r}
+##For BMI it was decided to split the data into 3 categories to allow  the data to be more useful and helpful in predictor the output of charges. The 3 categories will allow the data to be utilized to its full potential and output a more accurate model
+for (j in 1:nrow(insurance)) {
+  if(insurance$bmi[j] > 30){
+    insurance$bmi_category[j] = "obese"
+  }else{
+    insurance$bmi_category[j] = "not obese"
+  }
+}
+
+##In this boxplot of BMI in relation to charges we are able to see that being overweight has a major impact on charges compared to being normal and underweight as health issues arise when being obese
+ggplot(data = insurance, aes(bmi_category, charges)) + geom_boxplot(fill = c(1:2)) + ggtitle("Medical Charges for BMI Categories, Boxplot")
+```
+
+```{r}
+##Here the children attribute was categorized into 3 different parts in order to create a balanced distribution as the original attribute was distributed between 1 - 5 children. The amount of clients with 4 or 5 children was minimal which wasnt balanced with the other values.
+for (k in 1:nrow(insurance)){
+  if(insurance$children[k] == 0){
+    insurance$children_category[k] = "0"
+  }else if(insurance$children[k] == 1){
+    insurance$children_category[k] = "1"
+  }else if(insurance$children[k] == 2){
+    insurance$children_category[k] = "2"
+  }else{
+    insurance$children_category[k] = "3+"
+  }
+}
+
+##In this boxplot we are able to see that the number of children doesnt have a drastic affect on charges as the boxplots are relatively the same size
+ggplot(data = insurance, aes(children_category, charges)) + geom_boxplot(fill = c(1:4)) + ggtitle("Medical Charges by Number of Children, Boxplot")
+```
+
+```{r}
+##In this boxplot for smoking we are able to see that indivduals who smoke have higher charges than non-smokers and is a great attribute in predicting future medical costs
+ggplot(data = insurance, aes(smoker, charges)) + geom_boxplot(fill = c(1:2)) + ggtitle("Medical Charges from Smoking, Boxplot")
+```
+
+```{r}
+##For the region boxplot it is evident that there is much affect on medical charges and will most likely be dropped when running the different models. This will be confirmed as we run the first test on the model and see the correlation to charges.
+ggplot(data = insurance, aes(region, charges)) + geom_boxplot(fill = c(1:4)) + ggtitle("Medical Charges per Region, Boxplot")
+```
+##CORRELATION MATRIX
+```{r}
+##Created a new data frame in order to drop the original attributes that have been altered into new ones
+insurance_new <- select(insurance, -c(bmi, children))
+
+##Within the correlation matrix it is evident that there are 3 main attributes that are correlated with charges. These are age, smoker, and bmi_category. Although these 3 variables can be immediately used on the model, it is better to test all of them and slowly eliminate them as the results are outputted.
+pairs.panels(insurance_new, pch = 1, lm = TRUE, cex.cor = 1, hist.col="darkorchid", smoother = T, show.points = TRUE, 
+             density = TRUE, stars = TRUE, main="Correlation Matrix")
+```
+##HISTOGRAMS
+
+```{r}
+##This histogram is used to see the distribution of sex to make sure it is balanced
+ggplot(insurance, aes(x = sex)) + geom_bar(color = "black", fill = "deepskyblue") + geom_text(stat="count", aes(label=..count..), vjust=4)
+```
+
+```{r}
+##Here one is able to see that the underweight category has a small amount of data assigned  to it, during the modeling stage the categories can be changed to obese (BMI > 30) and not obese (BMI < 30) to better fit the model
+ggplot(insurance, aes(x = bmi_category)) + geom_bar(color = "black", fill = "deepskyblue")+ geom_text(stat="count", aes(label=..count..), vjust=2)
+```
+
+```{r}
+##In this histogram we are checking the distribution of the amount of children for clients
+ggplot(insurance, aes(children_category)) + geom_bar(color = "black", fill = "deepskyblue") + 
+  geom_text(stat="count", aes(label=..count..), vjust=-0.2)
+```
+
+```{r}
+##In this histogram we can see the distribution of smokers is not similar but since the correlation matrix shows that this is a signifcant attribute in relation to charges, it is acceptable
+ggplot(insurance, aes(x = smoker)) + geom_bar(color = "black", fill = "deepskyblue") + geom_text(stat="count", aes(label=..count..), vjust=4)
+```
+
+```{r}
+##The distribution for region is very close and will not be altered
+ggplot(insurance, aes(x = region)) + geom_bar(color = "black", fill = "deepskyblue") + geom_text(stat="count", aes(label=..count..), vjust=4)
+```
+##SCATTER PLOTS
+```{r}
+##In this scatter plot of age we can see that each age group is split up into 3 clusters, this can be in relation to different attributes which will be assesed later on
+ggplot(insurance, aes(x = age, y = charges)) + geom_jitter(aes(age), alpha = 0.7) + labs(x = "Age", y = "Charges") +  ggtitle("Relationship Between age and Charges")
+```
+
+```{r}
+##In this scatter plot of BMI category we can see that overweight category has higher charges than normal and underweight
+ggplot(insurance, aes(x = bmi_category, y = charges)) + geom_jitter(aes(bmi_category), alpha = 0.7) + 
+  labs(x = "BMI_Category", y = "Charges") +  ggtitle("Relationship Between bmi_category and Charges")
+```
+
+```{r}
+##In this scatter plot we can see the age distribution and how smoking affects the charges. As you can see there is a difference when individual smokes versus when they dont.
+ggplot(insurance, aes(x = age, y = charges)) + geom_jitter(aes(color = smoker), alpha = 0.7) + 
+  labs(x = "Age", y = "Charges", col = "Smoker Legend") +  ggtitle("Relationship Between Age, Smokers, and Charges")
+```
+
+```{r}
+##Here we can see that BMI has a a big affect on the charges as a majority of the overweight indivduals are higher on the graph in comparison to normal and underweight individuals
+ggplot(insurance, aes(x = age, y = charges)) + geom_jitter(aes(color = bmi_category), alpha = 0.7) + 
+  labs(x = "Age", y = "Charges", col = "BMI Category Legend") +  ggtitle("Relationship Between Age, BMI Category, and Charges")
+```
+
+```{r}
+##Here we can see that if you are obese and a smoker your charges skyrocket and you can see the major gap between obese and no smoker vs obese and smoker, with a few outliers
+ggplot(insurance, aes(x = bmi_category, y = charges)) + geom_jitter(aes(color = smoker), alpha = 0.7) + 
+  labs(x = "BMI Category", y = "Charges", col = "Smoker Legend") +  ggtitle("Relationship Between BMI Category, Smokers, and Charges")
+```
+##ALGORITHMS
+```{r}
+##MULTI-LINEAR REGRESSION
+
+##Setting the seed allows me to reproduce the output of the algorithm
+set.seed(1)
+
+##Here I am splitting the data into a training set and test set
+selection <- sample(1:nrow(insurance_new), 0.8 * nrow(insurance_new))
+train_LM = insurance_new[selection, ]
+test_LM = insurance_new[-selection, ]
+
+trainControl <- trainControl(method = "cv", number = 5)
+
+##This is the first model with all the attributes                    
+LM <- lm(charges ~ sex + smoker + region + age + bmi_category + children_category, data = train_LM)
+##First off we see that the Multiple R-squared values is 0.7729 which shows that the model explains the large value of variance in the model and is a good fit
+##Furthermore we can analyze the p-values to get a better understanding of which variable is helping the model versus hindering it
+summary(LM)
+
+##After receiving the p-values of the first linear regression model, the most significant attributes were chosen to test on the next model
+LM2 <- lm(charges ~ (smoker * bmi_category) + age + age^2, data = train_LM)
+summary(LM2)
+
+#Testing the model
+LM_Prediction <- predict(LM2, test_LM)
+model_output_LM <- data.frame(obs = test_LM$charges, pred = LM_Prediction)
+
+defaultSummary(model_output_LM)
+```
+
+```{r}
+##XGBOOST
+set.seed(2)
+
+selection1 <- sample(1:nrow(insurance_new), 0.8 * nrow(insurance_new))
+train_XGB <- insurance_new[selection, ]
+test_XGB <- insurance_new[-selection, ]
+
+sparse_train_XGB <- sparse.model.matrix(charges ~. -1, data = train_XGB)
+sparse_test_XGB <- sparse.model.matrix(charges ~. -1, data = test_XGB)
+
+
+##Baseline model to see how the model runs
+xgb <- xgboost(data = sparse_train_XGB, label = train_XGB$charges,
+               nrounds = 25,
+               nthread = 4,
+               eta = 0.1,
+               silent = 1)
+
+#Set standard parameters
+params <- list(objective = "reg:linear", eta = 0.1, gamma = 0, max_depth = 6)
+
+#First real model round to find the best number of nrounds for the model
+xgb1 <- xgb.cv(params = params, data = sparse_train_XGB,
+               nrounds = 100,
+               nfold = 5,
+               label = train_XGB$charges,
+               showsd = T,
+               print.every_n = 10,
+               early_stopping_round = 25,
+               maximize = F)
+               
+
+#Since the best iteration was in round 34 the nrounds is set to 35
+xgb2 <- xgboost(data = sparse_train_XGB, label = train_XGB$charges,
+               nrounds = 35,
+               nthread = 4,
+               eta = 0.1,
+               silent = 1)
+
+#The feature importance shows that some of the attributes aren't adding value and thus will be dropped
+xgb.importance(feature_names = NULL, model = xgb2)
+
+#Final model is outputted
+xgb3 <- train(charges ~ smoker + age + bmi_category,
+                   data = train_XGB, method = "xgbTree", trControl = trainControl)
+
+xgb3
+
+##Predicting the model
+xgb_prediction <- predict(xgb2, sparse_test_XGB)
+model_output_XGB <- data.frame(obs = test_XGB$charges, pred = xgb_prediction)
+
+#Checking the RMSE, RSquared and MAE
+defaultSummary(model_output_XGB)
+```
+
+```{r}
+##RANDOMFOREST
+set.seed(3)
+
+##Split the data into training, validation, and test
+selection2 <- sample(1:nrow(insurance_new), 0.8 * nrow(insurance_new))
+
+training_RF <- insurance_new[selection2, ]
+test_RF <- insurance_new[-selection2, ]
+
+##Here we can see that the variance explained is at 83.45% which is very good
+RF <- randomForest(charges ~ sex + smoker + region + age + bmi_category + children_category, data = training_RF, ntree = 500, mtry = 2, importance = TRUE)
+
+RF
+
+#Check variable importance
+varImpPlot(RF)
+
+#Eliminated variables that are not important to the model
+RF1 <- randomForest(charges ~ (smoker * bmi_category) + age^2 + age, data = training_RF, ntree = 500, mtry = 3, importance = TRUE)
+
+RF1
+
+#Cross Validation
+RF2 <- train(charges ~ (smoker * bmi_category) + age^2 + age, data = training_RF, method = "rf", trControl = trainControl)
+print(RF2)
+
+
+#Predicting the model
+RF_prediction <- predict(RF1, newdata = test_RF)
+model_output_RF <- data.frame(obs = test_RF$charges, pred = RF_prediction)
+
+defaultSummary(model_output_RF)
+```
+
+
+
+
+
+
+
+
+
